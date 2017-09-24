@@ -5,6 +5,57 @@ from PySide import QtGui, QtCore
 CURRENT_PATH = os.path.dirname(__file__)
 JSON_PATH = os.path.join(CURRENT_PATH, "config/color_config.json")
 ROW_COUNT = 0
+COL_DIC = {}
+COL_DIC["ALL_COLORS"] = {}
+COL_DIC["ALL_NODES"] = {}
+
+def buildTypeList(a_grid):
+    old_list = []
+    for temp_row in range(a_grid.rowCount()):
+        temp_layout = a_grid.itemAtPosition(temp_row, 2)
+        if temp_layout is not None:
+            old_list.extend(str(temp_layout.widget().text()).split(","))
+    old_set = set(old_list)
+    old_list = list(old_set)
+
+    return old_list
+
+def colorDict(grid):
+    global COL_DIC
+    default = '"Node Type",'
+
+    COL_DIC["ALL_COLORS"] = {}
+    COL_DIC["ALL_NODES"] = {}
+
+    for row in range(grid.rowCount()):
+        col_layout = grid.itemAtPosition(row, 1)
+        if col_layout is not None:
+            col_widget = col_layout.widget()
+            col_text = col_widget.text()
+
+            if not col_widget.text() == "Seclect Color":
+                col_name = col_widget.palette().color(QtGui.QPalette.Window).name()
+                col_rgbf = col_widget.palette().color(QtGui.QPalette.Window).getRgbF()
+
+                text = grid.itemAtPosition(row, 2).widget().text()
+
+                if not text == default and len(text):
+                    label = grid.itemAtPosition(row, 0).widget().text()
+                    idx = "".join([i for i in label if i.isdigit()])
+                    COL_DIC["ALL_COLORS"]["".join([idx, "_", col_name])] = text
+
+                    type_list = text.split(",")
+                    col_tuple = (col_rgbf[0], col_rgbf[1], col_rgbf[2])
+                    for entry in type_list:
+                        COL_DIC["ALL_NODES"][entry] = col_tuple
+
+    print "\n ++++++++++++++++++++++++++++"
+    for key, value in COL_DIC["ALL_COLORS"].iteritems():
+       print key, value
+    for key, value in COL_DIC["ALL_NODES"].iteritems():
+       print "ALL NODES:", key, value
+
+    pass
 
 class ColorLab(QtGui.QWidget):
     def __init__(self):
@@ -16,7 +67,7 @@ class ColorLab(QtGui.QWidget):
         cursor_pos = QtGui.QCursor().pos()
         parent = app.topLevelAt(cursor_pos)
 
-        self.setGeometry(200, 200, 800, 300)
+        self.setGeometry(200, 200, 500, 300)
         self.setWindowTitle("Color Lab")
         self.setWindowFlags(QtCore.Qt.Window)
 
@@ -74,32 +125,31 @@ class ColorLab(QtGui.QWidget):
             ROW_COUNT -= 1
 
         grid_label = QtGui.QLabel("  Color {}".format(str(ROW_COUNT+1).zfill(2)))
-        grid_label.setFixedWidth(110)
+        grid_label.setFixedWidth(60)
 
         grid_color = QtGui.QPushButton("")
         grid_color.setText("Select Color")
-        grid_color.setFixedHeight(30)
-        grid_color.setFixedWidth(150)
+        # grid_color.setFixedHeight(30)
+        grid_color.setFixedWidth(80)
         grid_color.clicked.connect(lambda: self.setColor(grid, grid_color))
 
-        grid_text = "test"
-        # grid_text = DropLineEdit(self, grid)
-        # grid_text.setFiexdHeight(30)
-        # grid_text.setText('"Node Type",')
-        # grid_text.setDragEnable(True)
-        # grid_text.setFocusPolicy(QtCore.Qt.ClickFocus)
-        # grid_text.returnPressed.connect(lambda: colorDict(grid))
-        # grid_text.returnPressed.connect(lambda: self.nodeTypeCheck(grid_text, grid))
+        grid_text = DropLineEdit(self, grid)
+        # grid_text.setFixedHeight(30)
+        grid_text.setText("")
+        grid_text.setDragEnabled(True)
+        grid_text.setFocusPolicy(QtCore.Qt.ClickFocus)
+        grid_text.returnPressed.connect(lambda: colorDict(grid))
+        grid_text.returnPressed.connect(lambda: self.nodeTypeCheck(grid_text, grid))
 
         grid_node = QtGui.QPushButton("")
         grid_node.setText("Add Node")
-        grid_node.setFixedHeight(30)
+        # grid_node.setFixedHeight(30)
         grid_node.setToolTip('Add selected node')
         grid_node.clicked.connect(lambda: self.addNode(grid, grid_node))
 
         grid_del = QtGui.QPushButton("")
-        grid_del.setText("X")
-        grid_del.setFixedHeight(30)
+        grid_del.setText("Del")
+        # grid_del.setFixedHeight(30)
         grid_del.setToolTip('Delete this row')
         grid_del.clicked.connect(lambda: self.deleteRow(grid, grid_del))
 
@@ -107,7 +157,7 @@ class ColorLab(QtGui.QWidget):
 
         grid.addWidget(grid_label, cur_row, 0)
         grid.addWidget(grid_color, cur_row, 1)
-        # grid.addWidget(grid_text, cur_row, 2)
+        grid.addWidget(grid_text, cur_row, 2)
         grid.addWidget(grid_node, cur_row, 3)
         grid.addWidget(grid_del, cur_row, 4)
 
@@ -136,8 +186,50 @@ class ColorLab(QtGui.QWidget):
 
             col_obj.setStyleSheet('QPushButton {background-color: %s}' % str(color))
             col_obj.setText(" ")
-            # str_obj.setText(value)
+            str_obj.setText(value)
         del stored
+
+class DropLineEdit(QtGui.QLineEdit):
+    def __init__(self, parent, a_grid):
+        super(DropLineEdit, self).__init__(parent)
+        self.a_grid = a_grid
+        self.setDragEnabled(True)
+
+    def dragEnterEvent(self, event):
+        data = event.mimeData()
+        if data.text():
+            event.acceptProposedAction()
+
+    def dragMoveEvent(self, event):
+        data = event.mimeData()
+        if data.text():
+            event.acceptProposedAction()
+
+    def dropEvent(self, event):
+        data = event.mimeData()
+
+        if data.text():
+            idx = self.a_grid.indexOf(self)
+            row = self.a_grid.getItemPosition(idx)[0]
+            cur_str = self.text()
+            str_list = []
+            node_list = []
+
+            old_list = buildTypeList(self.a_grid)
+
+            node_paths = data.text().split(",")
+
+            # for entry in node_paths:
+            #     if not hou.node(entry) is None:
+            #         node_list.append(hou.node(entry))
+            #         cur_type = hou.node(entry).type().name()
+            #         if not cur_type in str_list:
+            #             str_list.append(cur_type)
+            #
+            # nodeToQLineEdit(self, str_list, old_list, self.a_grid)
+            # colorNode(self, self.a_grid, node_list)
+            # colorDict(self.a_grid)
+
 
 def main():
     app = QtGui.QApplication(sys.argv)
