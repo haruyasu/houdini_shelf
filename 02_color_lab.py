@@ -49,11 +49,11 @@ def colorDict(grid):
                     for entry in type_list:
                         COL_DIC["ALL_NODES"][entry] = col_tuple
 
-    print "\n ++++++++++++++++++++++++++++"
-    for key, value in COL_DIC["ALL_COLORS"].iteritems():
-       print key, value
-    for key, value in COL_DIC["ALL_NODES"].iteritems():
-       print "ALL NODES:", key, value
+    # print "\n ++++++++++++++++++++++++++++"
+    # for key, value in COL_DIC["ALL_COLORS"].iteritems():
+    #    print key, value
+    # for key, value in COL_DIC["ALL_NODES"].iteritems():
+    #    print "ALL NODES:", key, value
 
     pass
 
@@ -71,9 +71,9 @@ class ColorLab(QtGui.QWidget):
         self.setWindowTitle("Color Lab")
         self.setWindowFlags(QtCore.Qt.Window)
 
-        header = QtGui.QLabel("Color Node")
+        # header = QtGui.QLabel("Color Node")
         # header.setStyleSheet('font-size: 30px; font-family: Arial;')
-        header.move(10, 10)
+        # header.move(10, 10)
 
         grid = QtGui.QGridLayout()
         grid_widget = QtGui.QWidget()
@@ -125,10 +125,10 @@ class ColorLab(QtGui.QWidget):
             ROW_COUNT -= 1
 
         grid_label = QtGui.QLabel("  Color {}".format(str(ROW_COUNT+1).zfill(2)))
-        grid_label.setFixedWidth(60)
+        grid_label.setFixedWidth(80)
 
         grid_color = QtGui.QPushButton("")
-        grid_color.setText("Select Color")
+        grid_color.setText("Color")
         # grid_color.setFixedHeight(30)
         grid_color.setFixedWidth(80)
         grid_color.clicked.connect(lambda: self.setColor(grid, grid_color))
@@ -170,6 +170,52 @@ class ColorLab(QtGui.QWidget):
         ROW_COUNT += 1
 
         return (grid_color, grid_text)
+
+    def setColor(self, a_grid, button):
+        col = QtGui.QColorDialog.getColor()
+        col_css = 'QPushButton {background-color: %s;}' % str(col.name())
+
+        button.setStyleSheet(col_css)
+        button.setText(" ")
+
+        # if hou.selectedNodes():
+        #     idx = a_grid.indexOf(button)
+        #     row = a_grid.getItemPosition(idx)[0]
+        #     str_field = a_grid.itemAtPosition(row, 2)
+        #     if str_field is not None:
+        #         cur_str_ls = [str(i) for i in str_field.widget().text().split(",")]
+        #         col = col.getRgbF()
+        #         hcol = hou.Color()
+        #         hcol.setRGB((col[0], col[1], col[2]))
+        #
+        #         for n in hou.selectedNodes():
+        #             if n.type().name() in cur_str_ls:
+        #                 n.setColor(hcol)
+
+        colorDict(a_grid)
+
+    def deleteRow(self, a_grid, button):
+        global ROW_COUNT
+
+        idx = a_grid.indexOf(button)
+        row = a_grid.getItemPosition(idx)[0]
+        for col in range(a_grid.columnCount()):
+            layout = a_grid.itemAtPosition(row, col)
+            if layout is not None:
+                layout.widget().deleteLater()
+                a_grid.removeItem(layout)
+
+        ROW_COUNT -= 1
+
+        item_count = 1
+        for row in range(a_grid.rowCount()):
+            layout = a_grid.itemAtPosition(row, 0)
+            if layout is not None:
+                label = layout.widget()
+                label.setText(" Color {}".format(str(item_count).zfill(2)))
+                item_count += 1
+
+        colorDict(a_grid)
 
     def buidInterface(self, grid):
         global JSON_PATH
