@@ -48,13 +48,6 @@ def colorDict(grid):
                     col_tuple = (col_rgbf[0], col_rgbf[1], col_rgbf[2])
                     for entry in type_list:
                         COL_DIC["ALL_NODES"][entry] = col_tuple
-
-    # print "\n ++++++++++++++++++++++++++++"
-    # for key, value in COL_DIC["ALL_COLORS"].iteritems():
-    #    print key, value
-    # for key, value in COL_DIC["ALL_NODES"].iteritems():
-    #    print "ALL NODES:", key, value
-
     pass
 
 class ColorLab(QtGui.QWidget):
@@ -88,7 +81,7 @@ class ColorLab(QtGui.QWidget):
         save_button = QtGui.QPushButton('Save')
         # save_button.setStyleSheet('font-size: 20px; font-family: Arial;')
         save_button.setFixedWidth(100)
-        save_button.clicked.connect(lambda: self.saveChanged())
+        save_button.clicked.connect(lambda: self.saveChanges())
 
         apply_button = QtGui.QPushButton('Apply')
         # apply_button.setStyleSheet('font-size: 20px; font-family: Arial;')
@@ -124,7 +117,7 @@ class ColorLab(QtGui.QWidget):
             grid.removeItem(temp)
             ROW_COUNT -= 1
 
-        grid_label = QtGui.QLabel("  Color {}".format(str(ROW_COUNT+1).zfill(2)))
+        grid_label = QtGui.QLabel(" Color {}".format(str(ROW_COUNT+1).zfill(2)))
         grid_label.setFixedWidth(80)
 
         grid_color = QtGui.QPushButton("")
@@ -178,19 +171,19 @@ class ColorLab(QtGui.QWidget):
         button.setStyleSheet(col_css)
         button.setText(" ")
 
-        # if hou.selectedNodes():
-        #     idx = a_grid.indexOf(button)
-        #     row = a_grid.getItemPosition(idx)[0]
-        #     str_field = a_grid.itemAtPosition(row, 2)
-        #     if str_field is not None:
-        #         cur_str_ls = [str(i) for i in str_field.widget().text().split(",")]
-        #         col = col.getRgbF()
-        #         hcol = hou.Color()
-        #         hcol.setRGB((col[0], col[1], col[2]))
-        #
-        #         for n in hou.selectedNodes():
-        #             if n.type().name() in cur_str_ls:
-        #                 n.setColor(hcol)
+        if hou.selectedNodes():
+            idx = a_grid.indexOf(button)
+            row = a_grid.getItemPosition(idx)[0]
+            str_field = a_grid.itemAtPosition(row, 2)
+            if str_field is not None:
+                cur_str_ls = [str(i) for i in str_field.widget().text().split(",")]
+                col = col.getRgbF()
+                hcol = hou.Color()
+                hcol.setRGB((col[0], col[1], col[2]))
+
+                for n in hou.selectedNodes():
+                    if n.type().name() in cur_str_ls:
+                        n.setColor(hcol)
 
         colorDict(a_grid)
 
@@ -216,6 +209,51 @@ class ColorLab(QtGui.QWidget):
                 item_count += 1
 
         colorDict(a_grid)
+
+    def addNode(self, a_grid, button):
+        if hou.selectedNodes():
+            idx = a_grid.indexOf(button)
+            row = a_grid.getItemPosition(idx)[0]
+            layout = a_grid.itemAtPosition(row, 2)
+            str_list = []
+            old_list = buildTypeList(a_grid)
+
+            for n in hou.selectedNodes():
+                add_str = n.type().name()
+                if not add_str in str_list:
+                    str_list.append(add_str)
+
+            if layout is not None:
+                content = layout.widget()
+                nodeToQLineEdit(content, str_list, old_list, a_grid)
+                colorNode(content, a_grid, None)
+
+            colorDict(a_grid)
+
+    def applyToScene(self, grid):
+        global COL_DIC
+        root = hou.node("/")
+
+        colorDict(grid)
+
+        for cur_node in root.allNodes():
+            try:
+                colors = tuple(COL_DIC["ALL_NODES"][cur_node.type().name()])
+                hcol = hou.Color()
+                hcol.setRGB(colors)
+                cur_node.setColor(hcol)
+            except:
+                pass
+
+    def saveChanges(self):
+        global JSON_PATH
+        global COL_DIC
+
+        file_open = open(JSON_PATH, "w")
+        b = json.dump(COL_DIC, file_open, indent=4, sort_keys=True)
+        file_open.close()
+        del b
+        print "Save Changes"
 
     def buidInterface(self, grid):
         global JSON_PATH
@@ -265,17 +303,16 @@ class DropLineEdit(QtGui.QLineEdit):
 
             node_paths = data.text().split(",")
 
-            # for entry in node_paths:
-            #     if not hou.node(entry) is None:
-            #         node_list.append(hou.node(entry))
-            #         cur_type = hou.node(entry).type().name()
-            #         if not cur_type in str_list:
-            #             str_list.append(cur_type)
-            #
-            # nodeToQLineEdit(self, str_list, old_list, self.a_grid)
-            # colorNode(self, self.a_grid, node_list)
-            # colorDict(self.a_grid)
+            for entry in node_paths:
+                if not hou.node(entry) is None:
+                    node_list.append(hou.node(entry))
+                    cur_type = hou.node(entry).type().name()
+                    if not cur_type in str_list:
+                        str_list.append(cur_type)
 
+            nodeToQLineEdit(self, str_list, old_list, self.a_grid)
+            colorNode(self, self.a_grid, node_list)
+            colorDict(self.a_grid)
 
 def main():
     app = QtGui.QApplication(sys.argv)
