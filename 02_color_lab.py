@@ -20,6 +20,43 @@ def buildTypeList(a_grid):
 
     return old_list
 
+def nodeToQLineEdit(widget, str_list, old_list, a_grid):
+    default = '"Node Type",'
+    str_list = [ i for i in str_list if i not in old_list]
+    if widget.text() == default:
+        if str_list:
+            widget.setText(",".join(str_list))
+        else:
+            print "Node type already exists!"
+    else:
+        if str_list:
+            A = widget.text().strip(",")
+            B = ",".join(str_list)
+            new_list = [i for i in [A, B] if len(i) > 0]
+            widget.setText(",".join(new_list))
+        else:
+            print "Node type already exists!"
+
+def colorNode(widget, a_grid, node_list):
+    if widget.text():
+        idx = a_grid.indexOf(widget)
+        row = a_grid.getItemPosition(idx)[0]
+        cur_str_ls = [str(i) for i in widget.text().split(",")]
+        col = a_grid.itemAtPosition(row, 1)
+        if not col.widget().text() == "Select Color":
+            col = col.widget().palette().color(QtGui.QPalette.Window).getRgbF()
+            hcol = hou.Color()
+            hcol.setRGB((col[0], col[1], col[2]))
+
+            if node_list is None:
+                for n in hou.selectedNodes():
+                    if n.type().name() in cur_str_ls:
+                        n.setColor(hcol)
+            else:
+                for n in node_list:
+                    if n.type().name() in cur_str_ls:
+                        n.setColor(hcol)
+
 def colorDict(grid):
     global COL_DIC
     default = '"Node Type",'
@@ -257,21 +294,59 @@ class ColorLab(QtGui.QWidget):
 
     def buidInterface(self, grid):
         global JSON_PATH
-        file_open = open(JSON_PATH)
-        stored = json.loads(file_open.read())
-        file_open.close()
-        stored = collections.OrderedDict(sorted(stored["ALL_COLORS"].items()))
-        for key, value in stored.iteritems():
-            new_obj = self.addRow(grid)
-            col_obj = new_obj[0]
-            str_obj = new_obj[1]
-            idx = int(key.split("_")[0])
-            color = key.split("_")[1]
+        try:
+            file_open = open(JSON_PATH)
+            stored = json.loads(file_open.read())
+            file_open.close()
+            stored = collections.OrderedDict(sorted(stored["ALL_COLORS"].items()))
+            for key, value in stored.iteritems():
+                new_obj = self.addRow(grid)
+                col_obj = new_obj[0]
+                str_obj = new_obj[1]
+                idx = int(key.split("_")[0])
+                color = key.split("_")[1]
 
-            col_obj.setStyleSheet('QPushButton {background-color: %s}' % str(color))
-            col_obj.setText(" ")
-            str_obj.setText(value)
-        del stored
+                col_obj.setStyleSheet('QPushButton {background-color: %s}' % str(color))
+                col_obj.setText(" ")
+                str_obj.setText(value)
+            del stored
+        except:
+            print "JSON file could not be read."
+
+    def nodeTypeCheck(self, text_field, a_grid):
+        valid_list = []
+        old_list = []
+        idx = a_grid.indexOf(text_field)
+        row = a_grid.getItemPosition(idx)[0]
+
+        for temp_row in range(a_grid.rowCount()):
+            temp_layout = a_grid.itemAtPosition(temp_row, 2)
+            if temp_layout is not None and temp_row != row:
+                old_list.extend(str(temp_layout.widget().text()).split(","))
+        old_set = set(old_list)
+        old_list = list(old_set)
+
+        entries = text_field.text()
+        entries = re.split(r'[\s,]+', entries)
+
+        for entry in entries:
+            type_bool = False
+            entry = entry.strip(" ")
+
+            for cat in hou.nodeTypeCategories():
+                cat = hou.nodeTypeCategories()[cat]
+                if entry in cat.nodeTypes():
+                    type_bool = True
+
+            old_bool = True if not entry in old_list else False
+            new_bool = True if not entry in valid_list else False
+
+            if all([type_bool, old_bool, new_bool]):
+                valid_list.append(entry)
+            else:
+                print "One or more invalied entries were removed"
+
+        text_field.setText(",".join(valid_list))
 
 class DropLineEdit(QtGui.QLineEdit):
     def __init__(self, parent, a_grid):
